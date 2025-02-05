@@ -24,7 +24,7 @@ from tests.models.utils import (TokensTextLogprobs,
 from vllm import LLM, SamplingParams
 from vllm.assets.image import ImageAsset
 from vllm.assets.video import VideoAsset
-from vllm.config import TaskOption, TokenizerPoolConfig
+from vllm.config import TaskOption, TokenizerPoolConfig, LoadFormat
 from vllm.connections import global_http_connection
 from vllm.distributed import (cleanup_dist_env_and_memory,
                               init_distributed_environment,
@@ -676,6 +676,7 @@ class VllmRunner:
         block_size: int = 16,
         enable_chunked_prefill: bool = False,
         swap_space: int = 4,
+        load_format: Union[LoadFormat, str] = LoadFormat.AUTO,
         enforce_eager: Optional[bool] = False,
         **kwargs,
     ) -> None:
@@ -693,6 +694,7 @@ class VllmRunner:
             max_model_len=max_model_len,
             block_size=block_size,
             enable_chunked_prefill=enable_chunked_prefill,
+            load_format=load_format,
             **kwargs,
         )
 

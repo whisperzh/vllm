@@ -42,7 +42,7 @@ ground_truth_generations = [
 @pytest.mark.quant_model
 @pytest.mark.skipif(not is_quant_method_supported("aqlm"),
                     reason="AQLM is not supported on this GPU type.")
-@pytest.mark.parametrize("model", ["ISTA-DASLab/Llama-2-7b-AQLM-2Bit-1x16-hf"])
+@pytest.mark.parametrize("model", ["s3://vllm-ci-model-weights/Llama-2-7b-AQLM-2Bit-1x16-hf/"])
 @pytest.mark.parametrize("dtype", ["half"])
 @pytest.mark.parametrize("max_tokens", [16])
 @pytest.mark.parametrize("num_logprobs", [1])
@@ -55,7 +55,7 @@ def test_models(
     num_logprobs: int,
 ) -> None:
 
-    with vllm_runner(model, dtype=dtype) as vllm_model:
+    with vllm_runner(model, dtype=dtype, load_format="runai_streamer") as vllm_model:
         vllm_outputs = vllm_model.generate_greedy_logprobs(
             example_prompts, max_tokens, num_logprobs)
 
