@@ -148,7 +148,7 @@ class S3Model:
 
         for file in files:
             destination_file = os.path.join(self.dir,
-                                            file.removeprefix(base_dir))
+                                            file.removeprefix(base_dir).lstrip('/'))
             local_dir = Path(destination_file).parent
             os.makedirs(local_dir, exist_ok=True)
             self.s3.download_file(bucket_name, file, destination_file)
