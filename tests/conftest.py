@@ -24,7 +24,7 @@ from tests.models.utils import (TokensTextLogprobs,
 from vllm import LLM, SamplingParams
 from vllm.assets.image import ImageAsset
 from vllm.assets.video import VideoAsset
-from vllm.config import TaskOption, TokenizerPoolConfig, LoadFormat
+from vllm.config import LoadFormat, TaskOption, TokenizerPoolConfig
 from vllm.connections import global_http_connection
 from vllm.distributed import (cleanup_dist_env_and_memory,
                               init_distributed_environment,
@@ -680,8 +680,25 @@ class VllmRunner:
         enforce_eager: Optional[bool] = False,
         **kwargs,
     ) -> None:
+        s3_models = [
+            "facebook/bart-base",
+            "llava-hf/llava-1.5-7b-hf",
+            "meta-llama/llama-2-7b-hf",
+            "openai-community/gpt2",
+            "ArthurZ/Ilama-3.2-1B",
+            "intfloat/e5-mistral-7b-instruct",
+            "jason9693/Qwen2.5-1.5B-apeach",
+            "Qwen/Qwen2.5-Math-RM-72B",
+        ]
+        load_format = LoadFormat.AUTO
+        if model_name in s3_models:
+            model_name = "s3://vllm-ci-model-weights/" + model_name.split(
+                "/")[-1]
+            load_format = LoadFormat.RUNAI_STREAMER
+
         self.model = LLM(
             model=model_name,
+            load_format=load_format,
             task=task,
             tokenizer=tokenizer_name,
             tokenizer_mode=tokenizer_mode,
@@ -694,7 +711,6 @@ class VllmRunner:
             max_model_len=max_model_len,
             block_size=block_size,
             enable_chunked_prefill=enable_chunked_prefill,
-            load_format=load_format,
             **kwargs,
         )
 

@@ -87,11 +87,6 @@ class ConfigFormat(str, enum.Enum):
 
 def file_or_path_exists(model: Union[str, Path], config_name: str,
                         revision: Optional[str]) -> bool:
-    print("model: ", model)
-    print("config_name: ", config_name)
-    print("revision: ", revision)
-    print("path: ", Path(model))
-    print()
     if Path(model).exists():
         return (Path(model) / config_name).is_file()
 
@@ -286,7 +281,7 @@ def get_hf_file_to_dict(file_name: str,
     - config_dict (dict): A dictionary containing 
     the contents of the downloaded file.
     """
-    
+
     file_path = Path(model) / file_name
     if file_or_path_exists(model=model,
                            config_name=file_name,
