@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-import argparse
 import logging
 import os
+import shutil
 
 import boto3
 from huggingface_hub import HfApi, snapshot_download
@@ -23,10 +23,10 @@ class ModelTransfer:
         Initialize the ModelTransfer class.
         
         Args:
-            model_id (str): HuggingFace model ID (e.g., 'meta-llama/Llama-2-7b')
+            model_id (str): HuggingFace model ID 
             s3_bucket (str): Name of the S3 bucket
-            aws_access_key_id (str, optional): AWS access key ID. Defaults to None.
-            aws_secret_access_key (str, optional): AWS secret access key. Defaults to None.
+            aws_access_key_id (str, optional)
+            aws_secret_access_key (str, optional)
             aws_region (str, optional): AWS region. Defaults to None.
         """
         self.model_id = model_id
@@ -53,7 +53,7 @@ class ModelTransfer:
         Returns:
             str: Path to the downloaded model directory
         """
-        logger.info(f"Downloading model {self.model_id}...")
+        logger.info("Downloading model %s...", self.model_id)
 
         try:
             local_dir_with_model = os.path.join(local_dir, self.model_name)
@@ -61,12 +61,12 @@ class ModelTransfer:
                               local_dir=local_dir_with_model,
                               local_dir_use_symlinks=False,
                               token=os.getenv("HF_TOKEN"))
-            logger.info(
-                f"Model downloaded successfully to {local_dir_with_model}")
+            logger.info("Model downloaded successfully to %s",
+                        local_dir_with_model)
             return local_dir_with_model
 
         except Exception as e:
-            logger.error(f"Error downloading model: {str(e)}")
+            logger.error("Error downloading model: %s", str(e))
             raise
 
     def upload_to_s3(self, local_dir):
@@ -76,7 +76,7 @@ class ModelTransfer:
         Args:
             local_dir (str): Local directory containing the model files
         """
-        logger.info(f"Uploading model to S3 bucket {self.s3_bucket}...")
+        logger.info("Uploading model to S3 bucket %s...", self.s3_bucket)
 
         try:
             # Walk through all files in the directory
@@ -102,54 +102,61 @@ class ModelTransfer:
                             Callback=lambda bytes_transferred: pbar.update(
                                 bytes_transferred))
 
-                    logger.info(
-                        f"Uploaded {filename} to s3://{self.s3_bucket}/{s3_path}"
-                    )
+                    logger.info("Uploaded %s to s3://%s/%s", filename,
+                                self.s3_bucket, s3_path)
 
             logger.info("Model upload completed successfully!")
 
         except Exception as e:
-            logger.error(f"Error uploading to S3: {str(e)}")
+            logger.error("Error uploading to S3: %s", str(e))
             raise
 
 
 def main():
     # Configuration
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model-id",
-                        type=str,
-                        required=True,
-                        help="HuggingFace model ID to download")
-    args = parser.parse_args()
-    MODEL_ID = args.model_id
+    MODEL_ID = [
+        "facebook/opt-350m",
+        "Qwen/Qwen2.5-7B-Instruct",
+        "Qwen/Qwen2-1.5B-Instruct",
+        "meta-llama/Llama-3.2-1B-Instruct",
+        "microsoft/Phi-3.5-vision-instruct",
+        "HuggingFaceH4/zephyr-7b-beta",
+        "llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
+        "ai21labs/Jamba-tiny-dev",
+        "google/gemma-2-2b-it",
+        "google/gemma-2b",
+        "google/gemma-2-9b",
+        "google/gemma-7b",
+    ]
     S3_BUCKET = "vllm-ci-model-weights"  # Replace with your S3 bucket name
     LOCAL_DIR = "~/models"  # Local directory to temporarily store the model
 
-    # AWS credentials (alternatively, use AWS CLI configuration or environment variables)
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     AWS_REGION = "us-west-2"
 
     # Create transfer object
-    transfer = ModelTransfer(model_id=MODEL_ID,
-                             s3_bucket=S3_BUCKET,
-                             aws_access_key_id=AWS_ACCESS_KEY_ID,
-                             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                             aws_region=AWS_REGION)
+    for model_id in MODEL_ID:
+        transfer = ModelTransfer(model_id=model_id,
+                                 s3_bucket=S3_BUCKET,
+                                 aws_access_key_id=AWS_ACCESS_KEY_ID,
+                                 aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                                 aws_region=AWS_REGION)
 
-    try:
-        # Create local directory if it doesn't exist
-        os.makedirs(LOCAL_DIR, exist_ok=True)
+        try:
+            # Create local directory if it doesn't exist
+            os.makedirs(LOCAL_DIR, exist_ok=True)
 
-        # Download model
-        model_dir = transfer.download_model(LOCAL_DIR)
+            # Download model
+            model_dir = transfer.download_model(LOCAL_DIR)
 
-        # Upload to S3
-        transfer.upload_to_s3(model_dir)
+            # Upload to S3 and cleanup
+            transfer.upload_to_s3(model_dir)
+            shutil.rmtree(model_dir)
 
-    except Exception as e:
-        logger.error(f"Error in transfer process: {str(e)}")
-        raise
+        except Exception as e:
+            logger.error("Error in transfer process: %s", str(e))
+            raise
 
 
 if __name__ == "__main__":

@@ -15,8 +15,10 @@ from vllm.platforms import current_platform
         ("s3://vllm-ci-model-weights/opt-125m", "generate", "generate"),
         ("s3://vllm-ci-model-weights/e5-mistral-7b-instruct", "pooling",
          "embed"),
-        ("jason9693/Qwen2.5-1.5B-apeach", "pooling", "classify"),
-        ("cross-encoder/ms-marco-MiniLM-L-6-v2", "pooling", "score"),
+        ("s3://vllm-ci-model-weights/Qwen2.5-1.5B-apeach", "pooling",
+         "classify"),
+        ("s3://vllm-ci-model-weights/ms-marco-MiniLM-L-6-v2", "pooling",
+         "score"),
         ("Qwen/Qwen2.5-Math-RM-72B", "pooling", "reward"),
     ],
 )
@@ -52,9 +54,9 @@ def test_incorrect_task(model_id, bad_task):
 
 
 MODEL_IDS_EXPECTED = [
-    ("Qwen/Qwen1.5-7B", 32768),
-    ("mistralai/Mistral-7B-v0.1", 4096),
-    ("mistralai/Mistral-7B-Instruct-v0.2", 32768),
+    ("s3://vllm-ci-model-weights/Qwen1.5-7B", 32768),
+    ("s3://vllm-ci-model-weights/Mistral-7B-v0.1", 4096),
+    ("s3://vllm-ci-model-weights/Mistral-7B-Instruct-v0.2", 32768),
 ]
 
 
@@ -81,9 +83,9 @@ def test_get_sliding_window():
     # For Qwen1.5/Qwen2, get_sliding_window() should be None
     # when use_sliding_window is False.
     qwen2_model_config = ModelConfig(
-        "Qwen/Qwen1.5-7B",
+        "s3://vllm-ci-model-weights/Qwen1.5-7B",
         task="auto",
-        tokenizer="Qwen/Qwen1.5-7B",
+        tokenizer="s3://vllm-ci-model-weights/Qwen1.5-7B",
         tokenizer_mode="auto",
         trust_remote_code=False,
         seed=0,
@@ -99,9 +101,9 @@ def test_get_sliding_window():
     assert qwen2_model_config.get_sliding_window() == TEST_SLIDING_WINDOW
 
     mistral_model_config = ModelConfig(
-        "mistralai/Mistral-7B-v0.1",
+        "s3://vllm-ci-model-weights/Mistral-7B-v0.1",
         task="auto",
-        tokenizer="mistralai/Mistral-7B-v0.1",
+        tokenizer="s3://vllm-ci-model-weights/Mistral-7B-v0.1",
         tokenizer_mode="auto",
         trust_remote_code=False,
         seed=0,
@@ -118,7 +120,7 @@ def test_get_sliding_window():
 @pytest.mark.skipif(current_platform.is_rocm(),
                     reason="Xformers backend is not supported on ROCm.")
 def test_get_pooling_config():
-    model_id = "sentence-transformers/all-MiniLM-L12-v2"
+    model_id = "s3://vllm-ci-model-weights/all-MiniLM-L12-v2"
     model_config = ModelConfig(
         model_id,
         task="auto",
@@ -140,7 +142,7 @@ def test_get_pooling_config():
 @pytest.mark.skipif(current_platform.is_rocm(),
                     reason="Xformers backend is not supported on ROCm.")
 def test_get_pooling_config_from_args():
-    model_id = "sentence-transformers/all-MiniLM-L12-v2"
+    model_id = "s3://vllm-ci-model-weights/all-MiniLM-L12-v2"
     model_config = ModelConfig(model_id,
                                task="auto",
                                tokenizer=model_id,
@@ -161,9 +163,9 @@ def test_get_pooling_config_from_args():
                     reason="Xformers backend is not supported on ROCm.")
 def test_get_bert_tokenization_sentence_transformer_config():
     bge_model_config = ModelConfig(
-        model="BAAI/bge-base-en-v1.5",
+        "s3://vllm-ci-model-weights/bge-base-en-v1.5",
         task="auto",
-        tokenizer="BAAI/bge-base-en-v1.5",
+        tokenizer="s3://vllm-ci-model-weights/bge-base-en-v1.5",
         tokenizer_mode="auto",
         trust_remote_code=False,
         seed=0,
@@ -183,9 +185,9 @@ def test_rope_customization():
     LONGCHAT_ROPE_SCALING = {"rope_type": "linear", "factor": 8.0}
 
     llama_model_config = ModelConfig(
-        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "s3://vllm-ci-model-weights/Meta-Llama-3-8B-Instruct",
         task="auto",
-        tokenizer="meta-llama/Meta-Llama-3-8B-Instruct",
+        tokenizer="s3://vllm-ci-model-weights/Meta-Llama-3-8B-Instruct",
         tokenizer_mode="auto",
         trust_remote_code=False,
         dtype="float16",
@@ -196,9 +198,9 @@ def test_rope_customization():
     assert llama_model_config.max_model_len == 8192
 
     llama_model_config = ModelConfig(
-        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "s3://vllm-ci-model-weights/Meta-Llama-3-8B-Instruct",
         task="auto",
-        tokenizer="meta-llama/Meta-Llama-3-8B-Instruct",
+        tokenizer="s3://vllm-ci-model-weights/Meta-Llama-3-8B-Instruct",
         tokenizer_mode="auto",
         trust_remote_code=False,
         dtype="float16",
@@ -215,9 +217,9 @@ def test_rope_customization():
     assert llama_model_config.max_model_len == 16384
 
     longchat_model_config = ModelConfig(
-        "lmsys/longchat-13b-16k",
+        "s3://vllm-ci-model-weights/longchat-13b-16k",
         task="auto",
-        tokenizer="lmsys/longchat-13b-16k",
+        tokenizer="s3://vllm-ci-model-weights/longchat-13b-16k",
         tokenizer_mode="auto",
         trust_remote_code=False,
         dtype="float16",
@@ -230,9 +232,9 @@ def test_rope_customization():
     assert longchat_model_config.max_model_len == 16384
 
     longchat_model_config = ModelConfig(
-        "lmsys/longchat-13b-16k",
+        "s3://vllm-ci-model-weights/longchat-13b-16k",
         task="auto",
-        tokenizer="lmsys/longchat-13b-16k",
+        tokenizer="s3://vllm-ci-model-weights/longchat-13b-16k",
         tokenizer_mode="auto",
         trust_remote_code=False,
         dtype="float16",
@@ -249,10 +251,10 @@ def test_rope_customization():
 @pytest.mark.skipif(current_platform.is_rocm(),
                     reason="Encoder Decoder models not supported on ROCm.")
 @pytest.mark.parametrize(("model_id", "is_encoder_decoder"), [
-    ("facebook/opt-125m", False),
-    ("facebook/bart-base", True),
-    ("meta-llama/Llama-3.2-1B", False),
-    ("meta-llama/Llama-3.2-11B-Vision", True),
+    ("s3://vllm-ci-model-weights/opt-125m", False),
+    ("s3://vllm-ci-model-weights/bart-base", True),
+    ("s3://vllm-ci-model-weights/Llama-3.2-1B", False),
+    ("s3://vllm-ci-model-weights/Llama-3.2-11B-Vision", True),
 ])
 def test_is_encoder_decoder(model_id, is_encoder_decoder):
     config = ModelConfig(
@@ -269,8 +271,8 @@ def test_is_encoder_decoder(model_id, is_encoder_decoder):
 
 
 @pytest.mark.parametrize(("model_id", "uses_mrope"), [
-    ("facebook/opt-125m", False),
-    ("Qwen/Qwen2-VL-2B-Instruct", True),
+    ("s3://vllm-ci-model-weights/opt-125m", False),
+    ("s3://vllm-ci-model-weights/Qwen2-VL-2B-Instruct", True),
 ])
 def test_uses_mrope(model_id, uses_mrope):
     config = ModelConfig(
@@ -287,7 +289,7 @@ def test_uses_mrope(model_id, uses_mrope):
 
 
 def test_generation_config_loading():
-    model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+    model_id = "s3://vllm-ci-model-weights/Qwen2.5-1.5B-Instruct"
 
     # When set generation_config to None, the default generation config
     # will not be loaded.

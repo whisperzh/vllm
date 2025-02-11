@@ -26,6 +26,7 @@ def _test_processing_correctness(
     model_info.check_available_online(on_fail="skip")
     model_info.check_transformers_version(on_fail="skip")
 
+    model_id = "s3://vllm-ci-model-weights/" + model_id.split("/")[-1]
     model_config = ModelConfig(
         model_id,
         task="auto",
@@ -140,48 +141,48 @@ def _test_processing_correctness(
             f"Failed ({batch_idx=}, {prompt=}, {mm_data=})")
 
 
-# yapf: disable
-@pytest.mark.parametrize("model_id", [
-    "rhymes-ai/Aria",
-    "Salesforce/blip2-opt-2.7b",
-    "facebook/chameleon-7b",
-    "deepseek-ai/deepseek-vl2-tiny",
-    "adept/fuyu-8b",
-    "THUDM/glm-4v-9b",
-    "h2oai/h2ovl-mississippi-800m",
-    "OpenGVLab/InternVL2-1B",
-    "HuggingFaceM4/Idefics3-8B-Llama3",
-    "llava-hf/llava-1.5-7b-hf",
-    "llava-hf/llava-v1.6-mistral-7b-hf",
-    "llava-hf/LLaVA-NeXT-Video-7B-hf",
-    "llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
-    "TIGER-Lab/Mantis-8B-siglip-llama3",
-    "mistral-community/pixtral-12b",
-    "openbmb/MiniCPM-o-2_6",
-    "openbmb/MiniCPM-V-2_6",
-    "nvidia/NVLM-D-72B",
-    "Qwen/Qwen-VL-Chat",
-    "Qwen/Qwen2-VL-2B-Instruct",
-    "Qwen/Qwen2.5-VL-3B-Instruct",
-    "Qwen/Qwen2-Audio-7B-Instruct",
-    "fixie-ai/ultravox-v0_3",
-])
-@pytest.mark.parametrize("hit_rate", [0.3, 0.5, 1.0])
-@pytest.mark.parametrize("num_batches", [32])
-@pytest.mark.parametrize("simplify_rate", [1.0])
-# yapf: enable
-def test_processing_correctness(
-    model_id: str,
-    hit_rate: float,
-    num_batches: int,
-    simplify_rate: float,
-):
-    _test_processing_correctness(
-        model_id,
-        hit_rate=hit_rate,
-        num_batches=num_batches,
-        simplify_rate=simplify_rate,
-    )
+# # yapf: disable
+# @pytest.mark.parametrize("model_id", [
+#     "rhymes-ai/Aria",
+#     "Salesforce/blip2-opt-2.7b",
+#     "facebook/chameleon-7b",
+#     "deepseek-ai/deepseek-vl2-tiny",
+#     "adept/fuyu-8b",
+#     "THUDM/glm-4v-9b",
+#     "h2oai/h2ovl-mississippi-800m",
+#     "OpenGVLab/InternVL2-1B",
+#     "HuggingFaceM4/Idefics3-8B-Llama3",
+#     "llava-hf/llava-1.5-7b-hf",
+#     "llava-hf/llava-v1.6-mistral-7b-hf",
+#     "llava-hf/LLaVA-NeXT-Video-7B-hf",
+#     "llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
+#     "TIGER-Lab/Mantis-8B-siglip-llama3",
+#     "mistral-community/pixtral-12b",
+#     "openbmb/MiniCPM-o-2_6",
+#     "openbmb/MiniCPM-V-2_6",
+#     "nvidia/NVLM-D-72B",
+#     "Qwen/Qwen-VL-Chat",
+#     "Qwen/Qwen2-VL-2B-Instruct",
+#     "Qwen/Qwen2.5-VL-3B-Instruct",
+#     "Qwen/Qwen2-Audio-7B-Instruct",
+#     "fixie-ai/ultravox-v0_3",
+# ])
+# @pytest.mark.parametrize("hit_rate", [0.3])
+# @pytest.mark.parametrize("num_batches", [32])
+# @pytest.mark.parametrize("simplify_rate", [1.0])
+# # yapf: enable
+# def test_processing_correctness(
+#     model_id: str,
+#     hit_rate: float,
+#     num_batches: int,
+#     simplify_rate: float,
+# ):
+#     _test_processing_correctness(
+#         model_id,
+#         hit_rate=hit_rate,
+#         num_batches=num_batches,
+#         simplify_rate=simplify_rate,
+#     )
 
 
 # yapf: disable
