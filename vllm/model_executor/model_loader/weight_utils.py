@@ -441,6 +441,7 @@ def runai_safetensors_weights_iterator(
                 disable=not enable_tqdm,
                 bar_format=_BAR_FORMAT,
         ):
+            print("Streaming file: ", st_file)
             streamer.stream_file(st_file)
             yield from streamer.get_tensors()
 
