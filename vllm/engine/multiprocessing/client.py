@@ -659,7 +659,8 @@ class MQLLMEngineClient(EngineClient):
             try:
                 while not finished:
                     request_output = await queue.get()
-
+                    logger.info("request_output")
+                    logger.info(request_output)
                     if isinstance(request_output, BaseException):
                         raise request_output
 

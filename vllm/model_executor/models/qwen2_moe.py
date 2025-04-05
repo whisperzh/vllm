@@ -159,7 +159,7 @@ class Qwen2MoeSparseMoeBlock(nn.Module):
             final_hidden_states = tensor_model_parallel_all_reduce(
                 final_hidden_states)
 
-        return final_hidden_states.view(orig_shape)
+        return final_hidden_states.view(orig_shape), router_logits
 
 
 class Qwen2MoeAttention(nn.Module):
@@ -314,8 +314,8 @@ class Qwen2MoeDecoderLayer(nn.Module):
         # Fully Connected
         hidden_states, residual = self.post_attention_layernorm(
             hidden_states, residual)
-        hidden_states = self.mlp(hidden_states)
-        return hidden_states, residual
+        hidden_states, router_logits= self.mlp(hidden_states)
+        return hidden_states, residual, router_logits
 
 
 @support_torch_compile
@@ -357,6 +357,7 @@ class Qwen2MoeModel(nn.Module):
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
+        router_logits = None
         if get_pp_group().is_first_rank:
             if inputs_embeds is not None:
                 hidden_states = inputs_embeds
@@ -368,14 +369,14 @@ class Qwen2MoeModel(nn.Module):
             hidden_states = intermediate_tensors["hidden_states"]
             residual = intermediate_tensors["residual"]
         for layer in self.layers[self.start_layer:self.end_layer]:
-            hidden_states, residual = layer(positions, hidden_states, residual)
+            hidden_states, residual, router_logits = layer(positions, hidden_states, residual)
         if not get_pp_group().is_last_rank:
             return IntermediateTensors({
                 "hidden_states": hidden_states,
                 "residual": residual
             })
         hidden_states, _ = self.norm(hidden_states, residual)
-        return hidden_states
+        return hidden_states, router_logits
 
 
 class Qwen2MoeForCausalLM(nn.Module, SupportsPP):
@@ -384,6 +385,10 @@ class Qwen2MoeForCausalLM(nn.Module, SupportsPP):
 
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
         super().__init__()
+        self.record_expert_selection = False
+        self.times=0
+        self.expert_selection_map = torch.zeros((1, 60), dtype=torch.int)
+
         config = vllm_config.model_config.hf_config
         quant_config = vllm_config.quant_config
         self.config = config
@@ -403,6 +408,12 @@ class Qwen2MoeForCausalLM(nn.Module, SupportsPP):
     def get_input_embeddings(self, input_ids: torch.Tensor) -> torch.Tensor:
         return self.model.get_input_embeddings(input_ids)
 
+    def switchExpertSelection(self,exp_selection):
+        self.record_expert_selection = exp_selection
+
+    def get_expert_selection(self):
+        return self.expert_selection_map
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -410,9 +421,25 @@ class Qwen2MoeForCausalLM(nn.Module, SupportsPP):
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
-        hidden_states = self.model(input_ids, positions, intermediate_tensors,
+        hidden_states, router_logits = self.model(input_ids, positions, intermediate_tensors,
                                    inputs_embeds)
-        return hidden_states
+        
+        if self.record_expert_selection:
+            self.times+=1
+            # self.times%=10
+            
+           # Select the top 4 experts per batch
+            _ , indices = torch.topk(router_logits, 4, dim=1)  # Shape: (4, 4)
+            # Create a new tensor of zeros with the same shape as x
+            result = torch.zeros_like(router_logits)
+
+            # Scatter the top values back into their original positions
+            result.scatter_(dim=1, index=indices,  value=1.0)
+
+            result=result.sum(dim=0)
+            self.expert_selection_map=self.expert_selection_map.add(result)
+            
+        return hidden_states, self.expert_selection_map
 
     def compute_logits(
         self,

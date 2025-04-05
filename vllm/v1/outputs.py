@@ -99,6 +99,8 @@ class ModelRunnerOutput:
     # [prompt_len, num_prompt_logprobs]
     # [prompt_len]
     prompt_logprobs_dict: dict[str, Optional[LogprobsTensors]]
+    
+    expert_selection: Optional[torch.Tensor]
 
 
 EMPTY_MODEL_RUNNER_OUTPUT = ModelRunnerOutput(
@@ -108,4 +110,5 @@ EMPTY_MODEL_RUNNER_OUTPUT = ModelRunnerOutput(
     spec_token_ids=None,
     logprobs=None,
     prompt_logprobs_dict={},
+    expert_selection=None
 )

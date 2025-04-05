@@ -152,7 +152,9 @@ class OpenAIServingCompletion(OpenAIServing):
                 trace_headers = (None if raw_request is None else await
                                  self._get_trace_headers(raw_request.headers))
 
+                logger.info(f"isBeam:{isinstance(sampling_params, BeamSearchParams)}")
                 if isinstance(sampling_params, BeamSearchParams):
+                    
                     generator = self.engine_client.beam_search(
                         prompt=engine_prompt,
                         request_id=request_id,
@@ -168,7 +170,9 @@ class OpenAIServingCompletion(OpenAIServing):
                         trace_headers=trace_headers,
                         priority=request.priority,
                     )
-
+                    # ret=self.engine_client.engine_core.executor_class.collective_rpc("get_expert_selection")
+                    # logger.info("get_expert_selection called")
+                    # logger.info(f"expert_selection{ret}")
                 generators.append(generator)
         except ValueError as e:
             # TODO: Use a vllm-specific Validation Error
@@ -187,6 +191,7 @@ class OpenAIServingCompletion(OpenAIServing):
                   and not request.use_beam_search)
 
         # Streaming response
+        logger.info(f"stream:{stream}")
         if stream:
             return self.completion_stream_generator(
                 request,
@@ -416,6 +421,7 @@ class OpenAIServingCompletion(OpenAIServing):
                                                                  Logprob]]]]
 
             for output in final_res.outputs:
+                logger.info(f"final_res.output:{output}")
                 assert request.max_tokens is not None
                 if request.echo:
                     assert prompt_text is not None

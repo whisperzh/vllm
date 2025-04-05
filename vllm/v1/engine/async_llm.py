@@ -256,7 +256,7 @@ class AsyncLLM(EngineClient):
         The caller of generate() iterates the returned AsyncGenerator,
         returning the RequestOutput back to the caller.
         """
-
+        logger.info("AsyncLLM being called")
         try:
             # We start the output_handler on the first call to generate() so
             # we can call __init__ before the event loop, which enables us

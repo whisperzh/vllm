@@ -499,10 +499,33 @@ async def create_completion(request: CompletionRequest, raw_request: Request):
         return JSONResponse(content=generator.model_dump(),
                             status_code=generator.code)
     elif isinstance(generator, CompletionResponse):
-        return JSONResponse(content=generator.model_dump())
+        a=generator.model_dump()
+        logger.info("model_dump")
+        logger.info(a)
+        return JSONResponse(content=a)
 
     return StreamingResponse(content=generator, media_type="text/event-stream")
+###############################
 
+# @router.post("/v1/expertusage", dependencies=[Depends(validate_json_request)])
+# @with_cancellation
+# @load_aware_call
+# async def create_expertusage(request: CompletionRequest, raw_request: Request):
+#     handler = completion(raw_request)
+#     if handler is None:
+#         return base(raw_request).create_error_response(
+#             message="The model does not support expertusage API")
+
+#     generator = await handler.create_expertusage(request, raw_request)
+#     if isinstance(generator, ErrorResponse):
+#         return JSONResponse(content=generator.model_dump(),
+#                             status_code=generator.code)
+#     elif isinstance(generator, CompletionResponse):
+#         return JSONResponse(content=generator.model_dump())
+
+#     return StreamingResponse(content=generator, media_type="text/event-stream")
+
+###############################
 
 @router.post("/v1/embeddings", dependencies=[Depends(validate_json_request)])
 @with_cancellation

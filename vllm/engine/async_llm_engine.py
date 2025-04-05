@@ -1036,6 +1036,8 @@ class AsyncLLMEngine(EngineClient):
             >>> # Process and return the final output
             >>> ...
         """
+        logger.info("AsyncLLMEngine being called")
+        
         try:
             async for output in await self.add_request(
                     request_id,
