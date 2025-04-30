@@ -6,6 +6,7 @@ import json
 import os
 from math import prod
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections import defaultdict
 
 import torch
 import triton
@@ -18,6 +19,7 @@ from vllm.model_executor.layers.quantization.utils.fp8_utils import (
     per_token_group_quant_fp8)
 from vllm.platforms import current_platform
 from vllm.utils import direct_register_custom_op, round_up
+from vllm.model_executor.layers.fused_moe.eplb import rebalance_experts
 
 from .rocm_aiter_fused_moe import (is_rocm_aiter_moe_enabled,
                                    rocm_aiter_fused_experts,
@@ -528,6 +530,15 @@ def moe_align_block_size_stage4(
         rank_post_pad = token_cnt + tl.load(cumsum_ptr + expert_id)
         tl.store(sorted_token_ids_ptr + rank_post_pad, i)
         tl.store(tokens_cnts_ptr + off_t + expert_id, token_cnt + 1)
+
+
+# @triton.jit
+# def EXP_load_balaning_expert_ids(expert_ids_ptr,
+#                              output_expert_ids_ptr,
+#                             threshold,
+#                             num_experts: tl.constexpr):
+   
+
 
 
 # Triton implementation based on:
@@ -1517,6 +1528,11 @@ def fused_experts_impl(hidden_states: torch.Tensor,
                        a1_scale: Optional[torch.Tensor] = None,
                        a2_scale: Optional[torch.Tensor] = None,
                        block_shape: Optional[List[int]] = None):
+
+    EXP_FEATURE_ON = True
+    EXP_FEATURE_CONFIG={
+        "expert_block_threshold":10
+    }
     # Check constraints.
     if use_int4_w4a16:
         assert hidden_states.shape[1] // 2 == w1.shape[
@@ -1531,6 +1547,23 @@ def fused_experts_impl(hidden_states: torch.Tensor,
     assert hidden_states.dtype in [
         torch.float32, torch.float16, torch.bfloat16
     ]
+    if EXP_FEATURE_ON:
+        # EXP_expert_duplicate(topk_ids,32,30)
+        # ww = torch.empty(w1.shape[0]+1,
+        #                  w1.shape[1],
+        #                 w1.shape[2],
+        #                 dtype=w1.dtype,
+        #                 device=hidden_states.device)
+        # ww = torch.cat([w1, w1[-1].unsqueeze(0)], dim=0)
+        # ww = w1[-1].unsqueeze(0)
+        new_topk_ids,new_exp_map =EXP_expert_duplicate(topk_ids.flatten(),1024,30)
+        new_topk_ids.to(topk_ids.dtype)
+        new_topk_ids = new_topk_ids.view(topk_ids.shape)
+        
+        slices1,slices2 = w1[new_exp_map],w2[new_exp_map]   # shape [len(map), H, W]
+        # Append to the back
+        w1 = torch.cat([w1, slices1], dim=0) 
+        w2 = torch.cat([w2, slices2], dim=0) 
 
     num_tokens, _ = hidden_states.shape
     E, N, _ = w1.shape
@@ -1622,6 +1655,7 @@ def fused_experts_impl(hidden_states: torch.Tensor,
             moe_align_block_size(curr_topk_ids, config['BLOCK_SIZE_M'],
                                  global_num_experts, expert_map))
 
+        logger.info(f"expert_ids.shape: {expert_ids.shape}")
         invoke_fused_moe_kernel(qcurr_hidden_states,
                                 w1,
                                 intermediate_cache1,
@@ -1682,8 +1716,82 @@ def fused_experts_impl(hidden_states: torch.Tensor,
 
         ops.moe_sum(intermediate_cache3.view(*intermediate_cache3.shape),
                     out_hidden_states[begin_chunk_idx:end_chunk_idx])
+    w1 = w1[:30]
+    w1 = w1[:30]
     return out_hidden_states
 
+def EXP_expert_duplicate(expert_ids,threshold,max_expert_id):
+    device = expert_ids.device
+    expert_ids=expert_ids.flatten()
+    # Step 1: Count tokens per expert (graph-safe)
+    expert_counts = torch.bincount(expert_ids)
+
+    # Step 2: Identify experts needing duplication (graph-safe)
+    experts_to_split = torch.nonzero(expert_counts > threshold).flatten()
+    
+    # Step 3: Calculate duplicates needed (graph-safe)
+    duplicate_counts = (expert_counts[experts_to_split] - 1) // threshold
+    num_new_experts = torch.sum(duplicate_counts).item()
+    
+    # Step 4: Create offset mapping (graph-safe)
+    duplicate_starts = torch.zeros_like(expert_counts)
+    if experts_to_split.numel() > 0:
+        offsets = torch.cat([
+            torch.tensor([0], device=device),
+            torch.cumsum(duplicate_counts, dim=0)
+        ])
+        duplicate_starts = torch.scatter(
+            torch.zeros_like(expert_counts),
+            0,
+            experts_to_split,
+            max_expert_id + 1 + offsets
+        )
+        
+    sorted_ids, sort_idx = torch.sort(expert_ids)
+    diff = torch.cat([
+            torch.ones(1, dtype=torch.bool, device=device),
+            sorted_ids[1:] != sorted_ids[:-1]
+        ])
+
+    
+    segment_ids = torch.cumsum(diff, dim=0) - 1
+    counts = torch.bincount(segment_ids)
+
+
+    
+    # Step 4: Calculate segment start positions
+    segment_starts = torch.cat([
+        torch.zeros(1, dtype=torch.long, device=device),
+        torch.cumsum(counts, dim=0)[:-1]
+    ])
+    # print(f"segment_starts: {segment_starts}")
+    
+    # Step 5: Compute counters within each segment
+    counters = torch.arange(len(expert_ids), device=device) - \
+              segment_starts.repeat_interleave(counts)
+
+    
+    counters = counters[torch.argsort(sort_idx)]
+
+        
+    # Step 6: Create final assignments (graph-safe)
+    reassign_mask = counters >= threshold
+    
+    reassign_pos = (counters - threshold) // threshold
+    
+    new_expert_ids = torch.where(
+        reassign_mask,
+        duplicate_starts[expert_ids] + reassign_pos,
+        expert_ids
+    )
+    map_mask = torch.where(new_expert_ids!=expert_ids,new_expert_ids,-1)!=-1
+    new_expert_map = torch.empty(new_expert_ids.max().item() + 1, device=new_expert_ids.device,
+                    dtype=torch.int32)
+
+    # Step 2: Fill C
+    new_expert_map[new_expert_ids[map_mask]] = expert_ids[map_mask]
+    new_expert_map = new_expert_map[max_expert_id:]
+    return new_expert_ids, new_expert_map
 
 def fused_moe(
     hidden_states: torch.Tensor,
@@ -1770,6 +1878,13 @@ def fused_moe(
     else:
         topk_weights, topk_ids = custom_routing_function(
             hidden_states, gating_output, topk, renormalize)
+        
+        
+    ## EXP_ feature
+
+    
+    
+    ## EXP_ feature
 
     return fused_experts(hidden_states,
                          w1,

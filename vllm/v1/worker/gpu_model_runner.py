@@ -1046,14 +1046,17 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Use persistent buffers for CUDA graphs.
         self.model.switchExpertSelection(True)
         with set_forward_context(attn_metadata, self.vllm_config):
-            hidden_states, expert_selection = self.model(
+            hidden_states = self.model(
                 input_ids=input_ids,
                 positions=positions,
                 intermediate_tensors=intermediate_tensors,
                 inputs_embeds=inputs_embeds,
             )
-        logger.info(f"expert_selection:{expert_selection}")
-        torch.save(expert_selection, 'expert_selection.pt')
+        try:
+            expert_selection = self.model.get_expert_selection()
+            torch.save(expert_selection, 'expert_selection.pt')
+        except:
+            logger.info("failed to get expert selection")
         if not get_pp_group().is_last_rank:
             # For mid-pipeline stages, return the hidden states.
             return hidden_states
@@ -1427,7 +1430,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             with set_forward_context(None,
                                      self.vllm_config,
                                      num_tokens=num_tokens):
-                hidden_states, _ = model(
+                hidden_states= model(
                     input_ids=input_ids,
                     positions=positions,
                     intermediate_tensors=intermediate_tensors,

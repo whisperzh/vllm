@@ -356,7 +356,7 @@ class Qwen2MoeModel(nn.Module):
         positions: torch.Tensor,
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-    ) -> Union[torch.Tensor, IntermediateTensors]:
+    ):
         router_logits = None
         if get_pp_group().is_first_rank:
             if inputs_embeds is not None:
@@ -439,7 +439,7 @@ class Qwen2MoeForCausalLM(nn.Module, SupportsPP):
             result=result.sum(dim=0)
             self.expert_selection_map=self.expert_selection_map.add(result)
             
-        return hidden_states, self.expert_selection_map
+        return hidden_states
 
     def compute_logits(
         self,
