@@ -1529,7 +1529,7 @@ def fused_experts_impl(hidden_states: torch.Tensor,
                        a2_scale: Optional[torch.Tensor] = None,
                        block_shape: Optional[List[int]] = None):
 
-    EXP_FEATURE_ON = True
+    EXP_FEATURE_ON = False
     EXP_FEATURE_CONFIG={
         "expert_block_threshold":10
     }
@@ -1716,8 +1716,6 @@ def fused_experts_impl(hidden_states: torch.Tensor,
 
         ops.moe_sum(intermediate_cache3.view(*intermediate_cache3.shape),
                     out_hidden_states[begin_chunk_idx:end_chunk_idx])
-    w1 = w1[:30]
-    w1 = w1[:30]
     return out_hidden_states
 
 def EXP_expert_duplicate(expert_ids,threshold,max_expert_id):
