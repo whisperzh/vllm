@@ -16,17 +16,17 @@ python3-dev \
 && rm -rf /var/lib/apt/lists/*
 # RUN apt-get install python-pip 
 RUN pip3 install -v flask
-
+RUN pip3 install -v vllm
 # 4. Clone the required repo (at build time)
 #    Or comment this out to do it dynamically at runtime instead
-RUN git clone https://github.com/whisperzh/vllm.git 
+# RUN git clone https://github.com/whisperzh/vllm.git 
 
-RUN cd vllm && \
-VLLM_USE_PRECOMPILED=1 pip install --editable .
+# RUN cd vllm && \
+# pip3 install --editable .
     # VLLM_USE_PRECOMPILED=1 
 # 5. Copy your expert Flask app
-COPY expert.py /app/vllm
+COPY expert.py /app
 
 
 # RUN python /app/vllm/expert.py
-CMD ["python3", "./vllm/expert.py"]
+CMD ["python3", "./expert.py"]

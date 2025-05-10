@@ -53,7 +53,7 @@ from vllm.model_executor.layers.vocab_parallel_embedding import (
 from vllm.model_executor.model_loader.weight_utils import default_weight_loader
 from vllm.model_executor.sampling_metadata import SamplingMetadata
 from vllm.sequence import IntermediateTensors
-
+import pickle
 from .interfaces import SupportsPP
 from .utils import (extract_layer_index, is_pp_missing_parameter,
                     make_empty_intermediate_tensors_factory, make_layers,
@@ -478,6 +478,7 @@ class Qwen2MoeForCausalLM(nn.Module, SupportsPP):
             num_experts=self.config.num_experts)
 
         params_dict = dict(self.named_parameters())
+            
         loaded_params: Set[str] = set()
         for name, loaded_weight in weights:
             if "rotary_emb.inv_freq" in name:
