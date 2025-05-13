@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 RANK = int(os.environ.get("RANK", 0))
 NUM_EXPERTS = int(os.environ.get("NUM_EXPERTS", 30))
-LOADED_EXPERTS = list(range(RANK*NUM_EXPERTS,(RANK+1)*NUM_EXPERTS)) 
+LOADED_EXPERTS = list(os.environ.get("LOADED_EXPERTS", range(RANK*NUM_EXPERTS,(RANK+1)*NUM_EXPERTS))) 
 
 GPU_IDX = int(os.environ.get("GPU_IDX", RANK))
 WEIGHT_PATH = os.environ.get("WEIGHT_PATH", "/home/ubuntu/vllm_test_field/vllm/ipc_handler_demo/weights")
@@ -19,14 +19,12 @@ cuda_device = f"cuda:{GPU_IDX}"
 
 
 def init_expert_map(total_expert_num):
-    print(f"LOADED_EXPERTS: {LOADED_EXPERTS}")
     expert_map = [-1]*total_expert_num
     for idx,e in enumerate(LOADED_EXPERTS):
         expert_map[e] = idx
     return torch.tensor(expert_map, device=cuda_device, dtype=torch.int32)
 
 def load_expert_weights(path, layer):
-    print(f"LOADED_EXPERTS: {LOADED_EXPERTS}")
     w1 = []
     w2 = []
     prefix=f"model_layers_{layer}_mlp_experts_"
@@ -56,8 +54,8 @@ def moe_forward(worker, inputs):
         topk_ids = inputs["topk_ids"],
         inplace = True,
         activation = "silu",
-        expert_map = expert_map,
-        global_num_experts = 60 
+        expert_map = expert_map if inputs.get("expert_map",None) is None else inputs["expert_map"],
+        global_num_experts = GLOBAL_NUM_EXPERTS 
     )
     return output
 
