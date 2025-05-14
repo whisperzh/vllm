@@ -26,7 +26,7 @@ RUN pip3 install -v vllm
     # VLLM_USE_PRECOMPILED=1 
 # 5. Copy your expert Flask app
 COPY expert.py /app
-COPY ./cuda_tools/ipc_tensor_tool.so /app
+COPY ./cuda_tools/libipc_tensor_tool.so /app
 
 
 # RUN python /app/vllm/expert.py

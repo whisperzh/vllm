@@ -22,7 +22,7 @@ cuda_device = f"cuda:{GPU_IDX}"
 
 
 # Load the shared library
-lib = ctypes.CDLL('./libipc_tensor_tool.so')
+lib = ctypes.CDLL('/home/ubuntu/vllm_test_field/vllm/flask_docker_app/cuda_tools/libipc_tensor_tool.so')
 lib.open_ipc_tensor.argtypes = [ctypes.c_void_p, ctypes.c_int]
 lib.open_ipc_tensor.restype = ctypes.c_void_p
 
@@ -36,6 +36,7 @@ DTYPE_SIZE = {
     torch.int64: 8,
     torch.float64: 8,
     torch.uint8: 1,
+    torch.bfloat16: 2,
     # add more if needed
 }
 
@@ -79,6 +80,8 @@ def restore_tensor(ipc_handle_bytes: bytes, shape, dtype=torch.float32, device=0
         ptr_type = ctypes.POINTER(ctypes.c_double)
     elif dtype == torch.uint8:
         ptr_type = ctypes.POINTER(ctypes.c_uint8)
+    elif dtype == torch.bfloat16:
+        ptr_type = ctypes.POINTER(ctypes.c_uint16)
     else:
         raise ValueError(f"Unsupported dtype for ctypes cast: {dtype}")
 
@@ -145,13 +148,13 @@ def forward():
     # topk_ids = request.json["topk_ids_handler"]
     
     hidden_states_handler = request.files['hidden_states_handler'].read()
-    topk_weights_handler = request.files['topk_weights'].read()
-    topk_ids_handler = request.files['topk_ids'].read()
+    topk_weights_handler = request.files['topk_weights_handler'].read()
+    topk_ids_handler = request.files['topk_ids_handler'].read()
     
     # 2. 获取字典数据（JSON 格式）
     hidden_states_meta = json.loads(request.form['hidden_states_meta']) 
-    topk_weights_meta = json.loads(request.form['topk_weights']) 
-    topk_ids_meta = json.loads(request.form['topk_ids']) 
+    topk_weights_meta = json.loads(request.form['topk_weights_meta']) 
+    topk_ids_meta = json.loads(request.form['topk_ids_meta']) 
     
 
     inputs={
