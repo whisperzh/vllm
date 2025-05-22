@@ -1,3 +1,4 @@
+// vllm/ipc_handler_demo/cuda_tools/ipc_tensor_pybind.cpp
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
@@ -12,7 +13,8 @@ namespace py = pybind11;
 torch::Tensor open_ipc_tensor_pybind(py::bytes handle_bytes, 
                                      int device,
                                      std::vector<int64_t> shape,
-                                     torch::ScalarType dtype) {
+                                     torch::Dtype dtype,
+                                     bool make_contiguous) {
     // Get the size of the bytes object using PyBytes_Size
     Py_ssize_t size = PyBytes_Size(handle_bytes.ptr());
     if (size != sizeof(cudaIpcMemHandle_t)) {
@@ -37,6 +39,13 @@ torch::Tensor open_ipc_tensor_pybind(py::bytes handle_bytes,
             std::string("cudaIpcOpenMemHandle failed: ") + cudaGetErrorString(err));
     }
 
+    // Synchronize CUDA device to ensure memory is available
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error(
+            std::string("cudaDeviceSynchronize failed: ") + cudaGetErrorString(err));
+    }
+
     // Calculate total number of elements
     int64_t numel = 1;
     for (auto dim : shape) {
@@ -56,20 +65,36 @@ torch::Tensor open_ipc_tensor_pybind(py::bytes handle_bytes,
         }, 
         options);
     
-    // Return a clone to ensure proper memory management
-    return tensor.clone();
+    // Return the tensor, either as is or as a clone
+    if (make_contiguous) {
+        return tensor.clone();
+    } else {
+        return tensor;
+    }
 }
 
 // Function to export an IPC handle from a PyTorch tensor
-py::bytes export_ipc_handle_pybind(torch::Tensor tensor) {
+py::bytes export_ipc_handle_pybind(torch::Tensor tensor, bool ensure_contiguous) {
     if (!tensor.is_cuda()) {
         throw std::runtime_error("Tensor must be on a CUDA device");
+    }
+    
+    // Make tensor contiguous if requested
+    if (ensure_contiguous && !tensor.is_contiguous()) {
+        tensor = tensor.contiguous();
+    }
+    
+    // Synchronize device to ensure memory is ready
+    cudaError_t err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error(
+            std::string("cudaDeviceSynchronize failed: ") + cudaGetErrorString(err));
     }
 
     void* dev_ptr = tensor.data_ptr();
     cudaIpcMemHandle_t handle;
     
-    cudaError_t err = cudaIpcGetMemHandle(&handle, dev_ptr);
+    err = cudaIpcGetMemHandle(&handle, dev_ptr);
     if (err != cudaSuccess) {
         throw std::runtime_error(
             std::string("cudaIpcGetMemHandle failed: ") + cudaGetErrorString(err));
@@ -85,9 +110,10 @@ PYBIND11_MODULE(ipc_tensor_pybind, m) {
     m.def("open_ipc_tensor", &open_ipc_tensor_pybind, 
           "Open an IPC handle and return a PyTorch tensor",
           py::arg("handle_bytes"), py::arg("device"), 
-          py::arg("shape"), py::arg("dtype"));
+          py::arg("shape"), py::arg("dtype"),
+          py::arg("make_contiguous") = false);
     
     m.def("export_ipc_handle", &export_ipc_handle_pybind,
           "Export an IPC handle from a PyTorch tensor",
-          py::arg("tensor"));
+          py::arg("tensor"), py::arg("ensure_contiguous") = true);
 }
