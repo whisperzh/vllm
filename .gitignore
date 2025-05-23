@@ -205,3 +205,4 @@ actionlint
 shellcheck*/
 *.ipc
 *.bin
+*.pt

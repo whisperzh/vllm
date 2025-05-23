@@ -60,7 +60,8 @@ int export_ipc_handle(void* dev_ptr, void* out_handle) {
         return -2;
     }
 
-    memcpy(out_handle, &handle, sizeof(cudaIpcMemHandle_t));
+    // memcpy(out_handle, &handle, sizeof(cudaIpcMemHandle_t));
+    memcpy(out_handle,reinterpret_cast<const char*>(&handle) , sizeof(cudaIpcMemHandle_t));
     return 0;
 }
 
