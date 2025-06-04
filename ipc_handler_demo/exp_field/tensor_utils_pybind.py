@@ -27,53 +27,48 @@ DTYPE_MAP = {
     'torch.bfloat16': torch.bfloat16,
 }
 
-def tensor_restore_from_handler_pybind(ipc_handle_bytes: bytes, meta, make_contiguous=False):
+class IPCHandleManager:
+    def __init__(self, handle_bytes, device):
+        self.dev_ptr = ipc_tensor_pybind.open_ipc_handle(handle_bytes, device)
+        self.device = device
+        
+    def create_tensor(self, meta, make_contiguous=False):
+        shape = meta['shape']
+        dtype_str = meta['dtype']
+        offset_bytes = meta['offset_bytes']
+        
+        dtype = DTYPE_MAP.get(dtype_str)
+        if dtype is None:
+            raise ValueError(f"Unsupported dtype: {dtype_str}")
+        
+        return ipc_tensor_pybind.create_tensor_from_ptr(
+            self.dev_ptr,
+            offset_bytes,
+            list(shape),
+            dtype,
+            self.device,
+            make_contiguous
+        )
+        
+    def close_ipc_handle(self):
+        if hasattr(self, 'dev_ptr'):
+            ipc_tensor_pybind.close_ipc_handle(self.dev_ptr)
+        
+    def __del__(self):
+        self.close_ipc_handle()
+
+def tensor_restore_from_handler_pybind(handle_manager, meta, make_contiguous=False):
     """
     Restore a tensor from an IPC handle using PyBind11.
     
     Args:
-        ipc_handle_bytes: The IPC handle as bytes
+        handle_manager: IPCHandleManager instance
         meta: Dictionary containing tensor metadata (shape, dtype, device)
         make_contiguous: Whether to make the tensor contiguous (creates a copy)
-    
-    Returns:
-        torch.Tensor: The restored tensor
     """
-    shape = meta['shape']
-    dtype_str = meta['dtype']
-    device = meta['device']
-    
-    if len(ipc_handle_bytes) != 64:
-        raise ValueError("Invalid IPC handle size")
+    return handle_manager.create_tensor(meta, make_contiguous)
 
-    # Convert string dtype to torch dtype
-    dtype = DTYPE_MAP.get(dtype_str)
-    if dtype is None:
-        raise ValueError(f"Unsupported dtype: {dtype_str}")
-    
-    # Ensure the device is ready
-    torch.cuda.synchronize(device)
-    
-    # Use PyBind11 module to restore tensor
-    tensor = ipc_tensor_pybind.open_ipc_tensor(
-        ipc_handle_bytes, 
-        device, 
-        list(shape), 
-        dtype,
-        make_contiguous
-    )
-    
-    # If strides were provided in metadata, try to respect them
-    if 'strides' in meta and not make_contiguous:
-        # This is a best-effort approach, as reshaping with strides is complex
-        # For now, we'll just verify if the tensor is contiguous when it should be
-        is_contiguous_in_meta = meta.get('is_contiguous', True)
-        if is_contiguous_in_meta != tensor.is_contiguous():
-            print(f"Warning: Tensor contiguity mismatch. Expected: {is_contiguous_in_meta}, Got: {tensor.is_contiguous()}")
-    
-    return tensor
-
-def get_ipc_handle_pybind(tensor: torch.Tensor, ensure_contiguous=True):
+def get_ipc_handle_pybind(tensor: torch.Tensor, ensure_contiguous=False):
     """
     Get an IPC handle from a tensor using PyBind11.
     
@@ -89,8 +84,9 @@ def get_ipc_handle_pybind(tensor: torch.Tensor, ensure_contiguous=True):
     
     # Synchronize to ensure all operations on the tensor are complete
     torch.cuda.synchronize(tensor.device)
-    
-    # Create metadata dictionary with more detailed information
+
+    ipc_handle_bytes = ipc_tensor_pybind.export_ipc_handle(tensor, ensure_contiguous)
+
     meta = {
         "shape": tensor.shape,
         "dtype": str(tensor.dtype),
@@ -101,6 +97,8 @@ def get_ipc_handle_pybind(tensor: torch.Tensor, ensure_contiguous=True):
     }
     
     # Get IPC handle using PyBind11 module
-    ipc_handle_bytes = ipc_tensor_pybind.export_ipc_handle(tensor, ensure_contiguous)
     
     return ipc_handle_bytes, meta
+
+def merge_tensors_and_export_ipc_handle(tensors, index):
+    return ipc_tensor_pybind.merge_tensors_and_export_ipc_handle(tensors,index)

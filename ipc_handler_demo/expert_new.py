@@ -88,12 +88,12 @@ def forward():
 
     hidden_states_handler = request.files['hidden_states_handler'].read()
     topk_weights_handler = request.files['topk_weights_handler'].read()
-    topk_ids_handler = request.files['topk_ids_handler'].read()
+    # topk_ids_handler = request.files['topk_ids_handler'].read()
     
     # 2. 获取字典数据（JSON 格式）
     hidden_states_meta = json.loads(request.form['hidden_states_meta']) 
     topk_weights_meta = json.loads(request.form['topk_weights_meta']) 
-    topk_ids_meta = json.loads(request.form['topk_ids_meta']) 
+    # topk_ids_meta = json.loads(request.form['topk_ids_meta']) 
     
     hidden_states = tensor_restore_from_handler_pybind(hidden_states_handler, hidden_states_meta)
     topk_weights = tensor_restore_from_handler_pybind(topk_weights_handler, topk_weights_meta)
